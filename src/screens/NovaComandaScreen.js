@@ -1,0 +1,209 @@
+import React, { useEffect, useState, useMemo } from 'react';
+import { View, Text, TextInput, Pressable, FlatList, StyleSheet, Alert } from 'react-native';
+import { query, run, calcularTotalComanda } from '../db';
+import AutocompleteInput from '../components/AutocompleteInput';
+import { money } from '../utils/format';
+import { emitComandaFechada } from '../utils/events';
+
+export default function NovaComandaScreen({ route, navigation }) {
+  const comandaIdParam = route?.params?.comandaId ?? null;
+  const [comandaId, setComandaId] = useState(comandaIdParam);
+  const [nome, setNome] = useState('');
+  const [status, setStatus] = useState('aberta'); // 'aberta' | 'fechada'
+  const [produtos, setProdutos] = useState([]);
+  const [itens, setItens] = useState([]);
+  const [qtd, setQtd] = useState('1');
+
+  const isFechada = status === 'fechada';
+
+  const carregarProdutos = () => {
+    const prods = query("SELECT * FROM produtos ORDER BY lower(nome) ASC");
+    setProdutos(prods);
+  };
+
+  const carregarComanda = (id) => {
+    const c = query("SELECT * FROM comandas WHERE id=?", [id])?.[0];
+    if (c) {
+      setNome(c.nome);
+      setStatus(c.status);
+    }
+  };
+
+  const carregarItens = (id) => {
+    const rows = query(`
+      SELECT i.id, i.comanda_id, i.produto_id, i.descricao, i.quantidade, i.preco_unit,
+             COALESCE(p.nome, i.descricao) as nomeProduto
+      FROM itens i
+      LEFT JOIN produtos p ON p.id = i.produto_id
+      WHERE i.comanda_id = ?
+      ORDER BY i.id DESC
+    `, [id]);
+    setItens(rows);
+  };
+
+  useEffect(() => {
+    carregarProdutos();
+    if (comandaId) {
+      carregarComanda(comandaId);
+      carregarItens(comandaId);
+    }
+  }, [comandaId]);
+
+  const criarComandaSeNecessario = () => {
+    if (comandaId) return comandaId;
+    if (!nome.trim()) {
+      Alert.alert('Informe um nome para a comanda');
+      return null;
+    }
+    const res = run("INSERT INTO comandas (nome, status) VALUES (?, 'aberta')", [nome.trim()]);
+    setComandaId(res.lastInsertRowId);
+    setStatus('aberta');
+    return res.lastInsertRowId;
+  };
+
+  const adicionarProduto = (produto) => {
+    if (isFechada) {
+      Alert.alert('Comanda fechada', 'Não é possível adicionar itens.');
+      return;
+    }
+    const id = criarComandaSeNecessario();
+    if (!id) return;
+    const quantidade = Math.max(1, parseInt(qtd || '1', 10));
+    run("INSERT INTO itens (comanda_id, produto_id, quantidade, preco_unit) VALUES (?, ?, ?, ?)", [
+      id, produto.id, quantidade, produto.preco
+    ]);
+    carregarItens(id);
+  };
+
+  const adicionarItemLivre = () => {
+    if (isFechada) {
+      Alert.alert('Comanda fechada', 'Não é possível adicionar itens.');
+      return;
+    }
+    const id = criarComandaSeNecessario();
+    if (!id) return;
+    Alert.prompt?.('Descrição do item', 'Digite a descrição e valor (ex: Bolo 12.50)', (text) => {
+      if (!text) return;
+      const parts = text.trim().split(' ');
+      const valStr = parts.pop();
+      const descricao = parts.join(' ');
+      const preco = parseFloat(String(valStr).replace(',', '.'));
+      const quantidade = Math.max(1, parseInt(qtd || '1', 10));
+      if (!descricao || isNaN(preco)) {
+        Alert.alert('Formato inválido', 'Use: Descrição Valor (ex: Bolo 12.50)');
+        return;
+      }
+      run("INSERT INTO itens (comanda_id, descricao, quantidade, preco_unit) VALUES (?, ?, ?, ?)", [
+        id, descricao, quantidade, preco
+      ]);
+      carregarItens(id);
+    });
+  };
+
+  const removerItem = (itemId) => {
+    if (isFechada) {
+      Alert.alert('Comanda fechada', 'Não é possível remover itens.');
+      return;
+    }
+    run("DELETE FROM itens WHERE id=?", [itemId]);
+    carregarItens(comandaId);
+  };
+
+  const finalizarComanda = () => {
+    if (!hasComanda) return;
+    const total = calcularTotalComanda(comandaId);
+    run("UPDATE comandas SET status='fechada', closed_at=datetime('now') WHERE id=?", [comandaId]);
+    setStatus('fechada');
+    // avisa a dashboard
+    emitComandaFechada({ comandaId, total });
+    Alert.alert('Comanda fechada', `Total: ${money(total)}`);
+    navigation.navigate('Comandas');
+};
+
+  const total = useMemo(() => comandaId ? calcularTotalComanda(comandaId) : 0, [itens, comandaId]);
+
+  return (
+    <View style={{ flex: 1, padding: 16 }}>
+      <Text style={styles.label}>Nome da Comanda</Text>
+      <TextInput
+        style={[styles.input, isFechada && styles.disabled]}
+        placeholder="Ex: Maria, Mesa 3..."
+        editable={!isFechada}
+        value={nome}
+        onChangeText={setNome}
+      />
+
+      <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+        <Text style={styles.label}>Qtd</Text>
+        <TextInput
+          style={[styles.input, { width: 80 }, isFechada && styles.disabled]}
+          keyboardType="numeric"
+          editable={!isFechada}
+          value={qtd}
+          onChangeText={setQtd}
+        />
+      </View>
+
+      <Text style={[styles.label, { marginTop: 12 }]}>Adicionar Produto</Text>
+      <View pointerEvents={isFechada ? 'none' : 'auto'} style={isFechada && { opacity: 0.6 }}>
+        <AutocompleteInput
+          data={produtos}
+          onSelect={adicionarProduto}
+          placeholder="Digite para buscar..."
+        />
+      </View>
+
+      <Pressable onPress={adicionarItemLivre} style={[styles.btnLivre, isFechada && styles.btnDisabled]}>
+        <Text style={styles.btnText}>+ Item Livre (descrição + valor)</Text>
+      </Pressable>
+
+      <Text style={[styles.label, { marginTop: 12 }]}>Itens da Comanda</Text>
+      <FlatList
+        data={itens}
+        keyExtractor={(i) => String(i.id)}
+        renderItem={({ item }) => (
+          <View style={styles.item}>
+            <View>
+              <Text style={{ fontWeight: 'bold' }}>{item.nomeProduto}</Text>
+              <Text>Qtd: {item.quantidade} • Unit: {money(item.preco_unit)}</Text>
+            </View>
+            {!isFechada && (
+              <Pressable onPress={() => removerItem(item.id)} style={styles.btnRem}>
+                <Text style={styles.btnTextSmall}>Remover</Text>
+              </Pressable>
+            )}
+          </View>
+        )}
+      />
+
+      <View style={styles.footer}>
+        <Text style={styles.totalText}>Total: {money(total)}</Text>
+        {isFechada ? (
+          <View style={[styles.btnFinalizada, { paddingHorizontal: 12 }]}>
+            <Text style={styles.btnText}>Fechada</Text>
+          </View>
+        ) : (
+          <Pressable onPress={finalizarComanda} style={styles.btnFechar}>
+            <Text style={styles.btnText}>Finalizar</Text>
+          </Pressable>
+        )}
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  label: { fontWeight: 'bold', marginBottom: 6 },
+  input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 12, marginBottom: 8 },
+  disabled: { backgroundColor: '#f1f1f1' },
+  btnLivre: { backgroundColor: '#455a64', padding: 10, borderRadius: 8, alignItems: 'center', marginTop: 6 },
+  btnDisabled: { opacity: 0.6 },
+  btnText: { color: '#fff', fontWeight: 'bold' },
+  item: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderColor: '#eee', borderRadius: 8, padding: 10, marginBottom: 8 },
+  btnRem: { backgroundColor: '#c62828', paddingVertical: 6, paddingHorizontal: 10, borderRadius: 6 },
+  btnTextSmall: { color: '#fff', fontWeight: 'bold' },
+  footer: { paddingTop: 12, borderTopWidth: 1, borderTopColor: '#eee', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  totalText: { fontSize: 18, fontWeight: 'bold' },
+  btnFechar: { backgroundColor: '#2e7d32', paddingVertical: 10, paddingHorizontal: 18, borderRadius: 8 },
+  btnFinalizada: { backgroundColor: '#9e9e9e', paddingVertical: 10, borderRadius: 8 }
+});

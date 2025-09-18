@@ -1,87 +1,150 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, Pressable, Alert, StyleSheet } from 'react-native';
-import * as FileSystem from 'expo-file-system';
+import React, { useMemo, useState } from 'react';
+import { View, Text, Pressable, Alert, StyleSheet, Platform } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
+// Use a API legada do FileSystem no SDK 54 (evita o erro de deprecado)
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import XLSX from 'xlsx';
 import { query } from '../db';
 import { todayISO } from '../utils/format';
 
 export default function ExportarScreen() {
-  const [data, setData] = useState('');
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [showPicker, setShowPicker] = useState(false);
+  const iso = useMemo(() => todayISO(selectedDate), [selectedDate]);
 
-  const usarHoje = () => setData(todayISO(new Date()));
+  const onChangeDate = (_event, date) => {
+    if (Platform.OS === 'android') setShowPicker(false);
+    if (date) setSelectedDate(date);
+  };
+
+  const setHoje = () => setSelectedDate(new Date());
+  const setOntem = () => { const d = new Date(); d.setDate(d.getDate() - 1); setSelectedDate(d); };
 
   const exportar = async () => {
-    const d = data.trim();
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) {
-      Alert.alert('Data inválida', 'Use o formato YYYY-MM-DD (ex: 2025-09-18).');
-      return;
+    try {
+      const rows = query(`
+        SELECT c.id as comanda_id, c.nome as comanda_nome, c.closed_at,
+               i.quantidade, i.preco_unit,
+               COALESCE(p.nome, i.descricao) as item_nome
+        FROM comandas c
+        JOIN itens i ON i.comanda_id = c.id
+        LEFT JOIN produtos p ON p.id = i.produto_id
+        WHERE c.status='fechada' AND date(c.closed_at) = date(?)
+        ORDER BY c.nome ASC, c.id ASC
+      `, [iso]);
+
+      if (!rows.length) {
+        Alert.alert('Sem dados', `Nenhuma comanda fechada em ${iso}.`);
+        return;
+      }
+
+      // ---- Monta a planilha (OOXML) ----
+      const header = ['Comanda', 'Item', 'Qtd', 'Unitário', 'Subtotal'];
+      const aoa = [ ['Data', iso], [], header ];
+
+      let totalDia = 0;
+      rows.forEach(r => {
+        const qtd = Number(r.quantidade) || 0;
+        const unit = Number(r.preco_unit) || 0;
+        const subtotal = qtd * unit;
+        totalDia += subtotal;
+        aoa.push([r.comanda_nome, r.item_nome, qtd, unit, subtotal]);
+      });
+      aoa.push([]);
+      aoa.push(['TOTAL DO DIA', '', '', '', totalDia]);
+
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+      // Formatação simples numérica (opcional)
+      // Define formatos de número para as colunas D (unitário) e E (subtotal)
+      const range = XLSX.utils.decode_range(ws['!ref']);
+      for (let R = 3; R <= range.e.r - 2; ++R) {
+        const cellD = XLSX.utils.encode_cell({ r: R, c: 3 }); // col D (0-based)
+        const cellE = XLSX.utils.encode_cell({ r: R, c: 4 }); // col E
+        if (!ws[cellD]) ws[cellD] = { t: 'n', v: 0 };
+        if (!ws[cellE]) ws[cellE] = { t: 'n', v: 0 };
+        ws[cellD].z = '0.00';
+        ws[cellE].z = '0.00';
+      }
+      // Total do dia (última linha)
+      const lastRow = range.e.r;
+      const totalCell = XLSX.utils.encode_cell({ r: lastRow, c: 4 });
+      if (ws[totalCell]) ws[totalCell].z = '0.00';
+
+      XLSX.utils.book_append_sheet(wb, ws, 'Resumo');
+
+      // ---- Gera arquivo como Base64 (xlsx real) ----
+      const wbout = XLSX.write(wb, { type: 'base64', bookType: 'xlsx' });
+
+      const filename = `resumo_${iso}.xlsx`;
+      const fileUri = FileSystem.cacheDirectory + filename;
+
+      // No legado, pode usar string 'base64' diretamente
+      await FileSystem.writeAsStringAsync(fileUri, wbout, { encoding: 'base64' });
+
+      const info = await FileSystem.getInfoAsync(fileUri);
+      if (!info.exists) {
+        Alert.alert('Erro', 'Falha ao salvar o arquivo XLSX.');
+        return;
+      }
+
+      const canShare = await Sharing.isAvailableAsync();
+      if (!canShare) {
+        Alert.alert('Arquivo gerado', `Salvo em cache:\n${fileUri}`);
+        return;
+      }
+
+      await Sharing.shareAsync(fileUri, {
+        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        UTI: 'org.openxmlformats.spreadsheetml.sheet', // iOS
+        dialogTitle: `Abrir “${filename}” com...`,
+      });
+    } catch (err) {
+      console.error('[EXPORT XLS ERROR]', err);
+      Alert.alert('Erro ao exportar', String(err?.message ?? err));
     }
-
-    const rows = query(`
-      SELECT c.id as comanda_id, c.nome as comanda_nome, c.closed_at,
-             i.quantidade, i.preco_unit,
-             COALESCE(p.nome, i.descricao) as item_nome
-      FROM comandas c
-      JOIN itens i ON i.comanda_id = c.id
-      LEFT JOIN produtos p ON p.id = i.produto_id
-      WHERE c.status='fechada' AND date(c.closed_at) = date(?)
-      ORDER BY c.nome ASC, c.id ASC
-    `, [d]);
-
-    if (rows.length === 0) {
-      Alert.alert('Sem dados', 'Nenhuma comanda fechada neste dia.');
-      return;
-    }
-
-    const sheetData = [
-      ['Data', d],
-      [],
-      ['Comanda', 'Item', 'Qtd', 'Unitário', 'Subtotal']
-    ];
-    let totalDia = 0;
-    rows.forEach(r => {
-      const subtotal = r.quantidade * r.preco_unit;
-      totalDia += subtotal;
-      sheetData.push([r.comanda_nome, r.item_nome, r.quantidade, r.preco_unit, subtotal]);
-    });
-    sheetData.push([]);
-    sheetData.push(['TOTAL DO DIA', '', '', '', totalDia]);
-
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.aoa_to_sheet(sheetData);
-    XLSX.utils.book_append_sheet(wb, ws, 'Resumo');
-    const wbout = XLSX.write(wb, { type: 'base64', bookType: 'xlsx' });
-
-    const fileUri = FileSystem.cacheDirectory + `resumo_${d}.xlsx`;
-    await FileSystem.writeAsStringAsync(fileUri, wbout, { encoding: FileSystem.EncodingType.Base64 });
-    await Sharing.shareAsync(fileUri, { mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   };
 
   return (
     <View style={{ flex: 1, padding: 16 }}>
       <Text style={styles.title}>Exportar Resumo do Dia</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="YYYY-MM-DD"
-        value={data}
-        onChangeText={setData}
-      />
-      <View style={{ flexDirection: 'row', gap: 10 }}>
-        <Pressable onPress={usarHoje} style={[styles.btn, { backgroundColor: '#616161' }]}>
+
+      <View style={styles.row}>
+        <Pressable style={styles.dateChip} onPress={() => setShowPicker(true)}>
+          <Text style={styles.dateChipText}>{iso}</Text>
+        </Pressable>
+        <Pressable style={[styles.btn, styles.btnSec]} onPress={setOntem}>
+          <Text style={styles.btnText}>Ontem</Text>
+        </Pressable>
+        <Pressable style={styles.btn} onPress={setHoje}>
           <Text style={styles.btnText}>Hoje</Text>
         </Pressable>
-        <Pressable onPress={exportar} style={styles.btn}>
-          <Text style={styles.btnText}>Exportar XLS</Text>
-        </Pressable>
       </View>
+
+      {showPicker && (
+        <DateTimePicker
+          value={selectedDate}
+          mode="date"
+          display={Platform.OS === 'ios' ? 'inline' : 'default'}
+          onChange={onChangeDate}
+        />
+      )}
+
+      <Pressable onPress={exportar} style={[styles.btn, { alignSelf: 'flex-start', marginTop: 8 }]}>
+        <Text style={styles.btnText}>Exportar XLSX</Text>
+      </Pressable>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   title: { fontSize: 18, fontWeight: 'bold', marginBottom: 8 },
-  input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 12, marginBottom: 8 },
+  row: { flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 8 },
+  dateChip: { borderWidth: 1, borderColor: '#ccc', borderRadius: 8, paddingVertical: 10, paddingHorizontal: 14, minWidth: 140, alignItems: 'center' },
+  dateChipText: { fontWeight: '600', color: '#333' },
   btn: { backgroundColor: '#2e7d32', padding: 12, borderRadius: 8, alignItems: 'center' },
+  btnSec: { backgroundColor: '#455a64' },
   btnText: { color: '#fff', fontWeight: 'bold' },
 });

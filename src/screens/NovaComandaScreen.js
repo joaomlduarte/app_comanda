@@ -49,39 +49,32 @@ export default function NovaComandaScreen({ route, navigation }) {
     }
   }, [comandaId]);
 
-  const criarComandaSeNecessario = () => {
-    if (comandaId) return comandaId;
-    if (!nome.trim()) {
-      Alert.alert('Informe um nome para a comanda');
-      return null;
-    }
-    const res = run("INSERT INTO comandas (nome, status) VALUES (?, 'aberta')", [nome.trim()]);
-    setComandaId(res.lastInsertRowId);
-    setStatus('aberta');
-    return res.lastInsertRowId;
-  };
-
   const adicionarProduto = (produto) => {
+    if (!comandaId) {
+      Alert.alert('Selecione pela lista', 'Abra uma comanda na aba "Comandas".');
+      return;
+    }
     if (isFechada) {
       Alert.alert('Comanda fechada', 'Não é possível adicionar itens.');
       return;
     }
-    const id = criarComandaSeNecessario();
-    if (!id) return;
     const quantidade = Math.max(1, parseInt(qtd || '1', 10));
     run("INSERT INTO itens (comanda_id, produto_id, quantidade, preco_unit) VALUES (?, ?, ?, ?)", [
-      id, produto.id, quantidade, produto.preco
+      comandaId, produto.id, quantidade, produto.preco
     ]);
-    carregarItens(id);
+    carregarItens(comandaId);
   };
 
   const adicionarItemLivre = () => {
+    if (!comandaId) {
+      Alert.alert('Selecione pela lista', 'Abra uma comanda na aba "Comandas".');
+      return;
+    }
     if (isFechada) {
       Alert.alert('Comanda fechada', 'Não é possível adicionar itens.');
       return;
     }
-    const id = criarComandaSeNecessario();
-    if (!id) return;
+    // Alert.prompt só existe no iOS; no Android você pode criar outro fluxo se quiser
     Alert.prompt?.('Descrição do item', 'Digite a descrição e valor (ex: Bolo 12.50)', (text) => {
       if (!text) return;
       const parts = text.trim().split(' ');
@@ -94,10 +87,18 @@ export default function NovaComandaScreen({ route, navigation }) {
         return;
       }
       run("INSERT INTO itens (comanda_id, descricao, quantidade, preco_unit) VALUES (?, ?, ?, ?)", [
-        id, descricao, quantidade, preco
+        comandaId, descricao, quantidade, preco
       ]);
-      carregarItens(id);
+      carregarItens(comandaId);
     });
+  };
+
+  const salvarNome = () => {
+    if (!comandaId) return;
+    const n = nome.trim();
+    if (!n) return;
+    run("UPDATE comandas SET nome=? WHERE id=?", [n, comandaId]);
+    Alert.alert('Salvo', 'Nome atualizado.');
   };
 
   const removerItem = (itemId) => {
@@ -110,28 +111,44 @@ export default function NovaComandaScreen({ route, navigation }) {
   };
 
   const finalizarComanda = () => {
-    if (!hasComanda) return;
+    if (!comandaId) return;
     const total = calcularTotalComanda(comandaId);
     run("UPDATE comandas SET status='fechada', closed_at=datetime('now') WHERE id=?", [comandaId]);
     setStatus('fechada');
-    // avisa a dashboard
     emitComandaFechada({ comandaId, total });
     Alert.alert('Comanda fechada', `Total: ${money(total)}`);
     navigation.navigate('Comandas');
-};
+  };
 
-  const total = useMemo(() => comandaId ? calcularTotalComanda(comandaId) : 0, [itens, comandaId]);
+  const total = useMemo(() => (comandaId ? calcularTotalComanda(comandaId) : 0), [itens, comandaId]);
+
+  if (!comandaId) {
+    return (
+      <View style={{ flex: 1, padding: 16, alignItems: 'center', justifyContent: 'center' }}>
+        <Text style={{ fontSize: 16, textAlign: 'center', color: '#555' }}>
+          Selecione uma comanda na aba {"Comandas"} para editar.
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <View style={{ flex: 1, padding: 16 }}>
       <Text style={styles.label}>Nome da Comanda</Text>
-      <TextInput
-        style={[styles.input, isFechada && styles.disabled]}
-        placeholder="Ex: Maria, Mesa 3..."
-        editable={!isFechada}
-        value={nome}
-        onChangeText={setNome}
-      />
+      <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+        <TextInput
+          style={[styles.input, { flex: 1 }, isFechada && styles.disabled]}
+          placeholder="Ex: Maria, Mesa 3..."
+          editable={!isFechada}
+          value={nome}
+          onChangeText={setNome}
+        />
+        {!isFechada && (
+          <Pressable style={styles.btnSalvar} onPress={salvarNome}>
+            <Text style={styles.btnTextSmall}>Salvar</Text>
+          </Pressable>
+        )}
+      </View>
 
       <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
         <Text style={styles.label}>Qtd</Text>
@@ -196,12 +213,13 @@ const styles = StyleSheet.create({
   label: { fontWeight: 'bold', marginBottom: 6 },
   input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 12, marginBottom: 8 },
   disabled: { backgroundColor: '#f1f1f1' },
+  btnSalvar: { backgroundColor: '#0288d1', paddingVertical: 10, paddingHorizontal: 12, borderRadius: 8 },
+  btnTextSmall: { color: '#fff', fontWeight: 'bold' },
   btnLivre: { backgroundColor: '#455a64', padding: 10, borderRadius: 8, alignItems: 'center', marginTop: 6 },
   btnDisabled: { opacity: 0.6 },
   btnText: { color: '#fff', fontWeight: 'bold' },
   item: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderColor: '#eee', borderRadius: 8, padding: 10, marginBottom: 8 },
   btnRem: { backgroundColor: '#c62828', paddingVertical: 6, paddingHorizontal: 10, borderRadius: 6 },
-  btnTextSmall: { color: '#fff', fontWeight: 'bold' },
   footer: { paddingTop: 12, borderTopWidth: 1, borderTopColor: '#eee', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   totalText: { fontSize: 18, fontWeight: 'bold' },
   btnFechar: { backgroundColor: '#2e7d32', paddingVertical: 10, paddingHorizontal: 18, borderRadius: 8 },

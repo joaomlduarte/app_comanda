@@ -1,5 +1,6 @@
 // App.js — Tabs com ícones + tema claro fixo
 import 'react-native-gesture-handler';
+import './src/shims';
 import React, { useEffect, useState } from 'react';
 import { Platform, View, Text, Linking, Pressable, ActivityIndicator } from 'react-native';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';

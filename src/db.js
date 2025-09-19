@@ -26,10 +26,12 @@ function runSync(sql, params = []) {
 }
 
 export function initDb() {
+  ensureColumnPago();
   if (isWeb) {
     console.warn('[db] SQLite indisponível no Web. Rode no Android/iOS.');
     return;
   }
+  
 
   // Modo WAL
   exec(`PRAGMA journal_mode = WAL;`);
@@ -65,6 +67,7 @@ export function initDb() {
       FOREIGN KEY (produto_id) REFERENCES produtos(id)
     );
   `);
+
 
   // Índices úteis (idempotentes)
   exec(`CREATE INDEX IF NOT EXISTS idx_itens_comanda ON itens(comanda_id);`);
@@ -108,4 +111,18 @@ export function faturamentoDoDia(iso /* 'YYYY-MM-DD' */) {
       AND substr(c.closed_at, 1, 10) = ?
   `, [iso]);
   return Number(rows?.[0]?.total ?? 0);
+}
+
+// src/db.js
+export function ensureColumnPago() {
+  try {
+    const cols = query("PRAGMA table_info('comandas')");
+    const has = cols?.some?.((c) => c.name === 'pago');
+    if (!has) {
+      // 1 = pago, 0 = não pago, null = legado
+      run("ALTER TABLE comandas ADD COLUMN pago INTEGER");
+    }
+  } catch (e) {
+    console.warn('[ensureColumnPago]', e);
+  }
 }

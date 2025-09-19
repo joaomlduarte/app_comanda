@@ -24,7 +24,7 @@ export default function ExportarScreen() {
   const exportar = async () => {
     try {
       const rows = query(`
-        SELECT c.id as comanda_id, c.nome as comanda_nome, c.closed_at,
+        SELECT c.id as comanda_id, c.nome as comanda_nome, c.closed_at, c.pago,
                i.quantidade, i.preco_unit,
                COALESCE(p.nome, i.descricao) as item_nome
         FROM comandas c
@@ -40,16 +40,17 @@ export default function ExportarScreen() {
       }
 
       // ---- Monta a planilha (OOXML) ----
-      const header = ['Comanda', 'Item', 'Qtd', 'Unitário', 'Subtotal'];
+      const header = ['Comanda', 'Situação', 'Item', 'Qtd', 'Unitário', 'Subtotal'];
       const aoa = [ ['Data', iso], [], header ];
 
       let totalDia = 0;
       rows.forEach(r => {
+        const situacao = r.pago === 1 ? 'Pago' : (r.pago === 0 ? 'Não pago' : '-');
         const qtd = Number(r.quantidade) || 0;
         const unit = Number(r.preco_unit) || 0;
         const subtotal = qtd * unit;
         totalDia += subtotal;
-        aoa.push([r.comanda_nome, r.item_nome, qtd, unit, subtotal]);
+        aoa.push([r.comanda_nome, situacao, r.item_nome, qtd, unit, subtotal]);
       });
       aoa.push([]);
       aoa.push(['TOTAL DO DIA', '', '', '', totalDia]);
@@ -59,19 +60,34 @@ export default function ExportarScreen() {
 
       // Formatação simples numérica (opcional)
       // Define formatos de número para as colunas D (unitário) e E (subtotal)
+
+      
+      // Atualiza formatos numéricos (considerando header com "Situação")
       const range = XLSX.utils.decode_range(ws['!ref']);
+
+      // Dados começam na linha 3 (0-based): 0=['Data', iso], 1=linha vazia, 2=header
+      // range.e.r é a última linha: temos uma linha em branco e depois a linha "TOTAL DO DIA"
+      // Por isso usamos (e.r - 2) para parar antes dessas duas.
       for (let R = 3; R <= range.e.r - 2; ++R) {
-        const cellD = XLSX.utils.encode_cell({ r: R, c: 3 }); // col D (0-based)
-        const cellE = XLSX.utils.encode_cell({ r: R, c: 4 }); // col E
-        if (!ws[cellD]) ws[cellD] = { t: 'n', v: 0 };
-        if (!ws[cellE]) ws[cellE] = { t: 'n', v: 0 };
-        ws[cellD].z = '0.00';
-        ws[cellE].z = '0.00';
-      }
-      // Total do dia (última linha)
-      const lastRow = range.e.r;
-      const totalCell = XLSX.utils.encode_cell({ r: lastRow, c: 4 });
-      if (ws[totalCell]) ws[totalCell].z = '0.00';
+        const cQtd  = XLSX.utils.encode_cell({ r: R, c: 3 }); // D = Qtd
+        const cUnit = XLSX.utils.encode_cell({ r: R, c: 4 }); // E = Unitário
+        const cSubt = XLSX.utils.encode_cell({ r: R, c: 5 }); // F = Subtotal
+
+        // Garante que as células existam e são numéricas
+        if (!ws[cQtd])  ws[cQtd]  = { t: 'n', v: 0 };
+        if (!ws[cUnit]) ws[cUnit] = { t: 'n', v: 0 };
+        if (!ws[cSubt]) ws[cSubt] = { t: 'n', v: 0 };
+
+        // Formatação: Qtd = inteiro, Unitário/Subtotal = 2 casas
+        ws[cQtd].z  = '0';
+        ws[cUnit].z = '0.00';
+        ws[cSubt].z = '0.00';
+}
+
+// Total do dia (última linha), agora na coluna F (c=5)
+const lastRow = range.e.r;
+const totalCell = XLSX.utils.encode_cell({ r: lastRow, c: 5 });
+if (ws[totalCell]) ws[totalCell].z = '0.00';
 
       XLSX.utils.book_append_sheet(wb, ws, 'Resumo');
 

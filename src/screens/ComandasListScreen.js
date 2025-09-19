@@ -3,6 +3,8 @@ import { View, Text, FlatList, Pressable, StyleSheet, TextInput, Alert } from 'r
 import { query, run, calcularTotalComanda } from '../db';
 import { money } from '../utils/format';
 import { emitComandaFechada } from '../utils/events';
+import { nowSqlLocal } from '../utils/time';
+
 
 export default function ComandasListScreen({ navigation }) {
   const [comandas, setComandas] = useState([]);
@@ -19,13 +21,36 @@ export default function ComandasListScreen({ navigation }) {
     return unsubscribe;
   }, [navigation]);
 
-  const fechar = (id) => {
-    const total = calcularTotalComanda(id);
-    run("UPDATE comandas SET status='fechada', closed_at=? WHERE id=?", [new Date().toISOString().slice(0,19).replace('T',' '), id]);
-    emitComandaFechada({ comandaId: id, total });
-    Alert.alert('Comanda fechada', `Total: ${money(total)}`);
-    carregar();
-  };
+const fechar = (id) => {
+  const total = calcularTotalComanda(id);
+
+  Alert.alert(
+    'Finalizar comanda',
+    'Marcar como PAGA?',
+    [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Não pago',
+        onPress: () => {
+          run("UPDATE comandas SET status='fechada', pago=?, closed_at=? WHERE id=?", [0, nowSqlLocal(), id]);
+          emitComandaFechada({ comandaId: id, total });
+          Alert.alert('Comanda fechada', `Total: ${money(total)} (Não paga)`);
+          carregar();
+        }
+      },
+      {
+        text: 'Pago',
+        onPress: () => {
+          run("UPDATE comandas SET status='fechada', pago=?, closed_at=? WHERE id=?", [1, nowSqlLocal(), id]);
+          emitComandaFechada({ comandaId: id, total });
+          Alert.alert('Comanda fechada', `Total: ${money(total)} (Paga)`);
+          carregar();
+        }
+      },
+    ],
+    { cancelable: true }
+  );
+};
 
   const abrirParaEditar = (id) => {
     navigation.navigate('EditarComanda', { comandaId: id });

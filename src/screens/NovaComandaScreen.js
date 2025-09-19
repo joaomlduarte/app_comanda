@@ -112,15 +112,40 @@ export default function NovaComandaScreen({ route, navigation }) {
     carregarItens(comandaId);
   };
 
-  const finalizarComanda = () => {
-    if (!comandaId) return;
-    const total = calcularTotalComanda(comandaId);
-    run("UPDATE comandas SET status='fechada', closed_at=? WHERE id=?", [nowSqlLocal(), comandaId]);
-    setStatus('fechada');
-    emitComandaFechada({ comandaId, total });
-    Alert.alert('Comanda fechada', `Total: ${money(total)}`);
-    navigation.navigate('Comandas');
-  };
+const finalizarComanda = () => {
+  if (!comandaId) return;
+  const total = calcularTotalComanda(comandaId);
+
+  Alert.alert(
+    'Finalizar comanda',
+    'Marcar como PAGA?',
+    [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Não pago',
+        onPress: () => {
+          run("UPDATE comandas SET status='fechada', pago=?, closed_at=? WHERE id=?", [0, nowSqlLocal(), comandaId]);
+          setStatus('fechada');
+          emitComandaFechada({ comandaId, total });
+          Alert.alert('Comanda fechada', `Total: ${money(total)} (Não paga)`);
+          navigation.navigate('Comandas');
+        }
+      },
+      {
+        text: 'Pago',
+        onPress: () => {
+          run("UPDATE comandas SET status='fechada', pago=?, closed_at=? WHERE id=?", [1, nowSqlLocal(), comandaId]);
+          setStatus('fechada');
+          emitComandaFechada({ comandaId, total });
+          Alert.alert('Comanda fechada', `Total: ${money(total)} (Paga)`);
+          navigation.navigate('Comandas');
+        }
+      },
+    ],
+    { cancelable: true }
+  );
+};
+
 
   const total = useMemo(() => (comandaId ? calcularTotalComanda(comandaId) : 0), [itens, comandaId]);
 

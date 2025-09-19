@@ -1,5 +1,9 @@
 // App.js — Tabs com ícones + tema claro fixo
 import 'react-native-gesture-handler';
+import { TextInput } from 'react-native';
+// força placeholder cinza em todos os TextInput
+TextInput.defaultProps ??= {};
+TextInput.defaultProps.placeholderTextColor = '#9E9E9E';
 import './src/shims';
 import React, { useEffect, useState } from 'react';
 import { Platform, View, Text, Linking, Pressable, ActivityIndicator } from 'react-native';

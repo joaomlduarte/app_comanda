@@ -21,9 +21,8 @@ export default function ComandasListScreen({ navigation }) {
 
   const fechar = (id) => {
     const total = calcularTotalComanda(id);
-    run("UPDATE comandas SET status='fechada', closed_at=datetime('now') WHERE id=?", [id]);
-    // avisa o dashboard
-    emitComandaFechada({comandaId: id, total});
+    run("UPDATE comandas SET status='fechada', closed_at=? WHERE id=?", [new Date().toISOString().slice(0,19).replace('T',' '), id]);
+    emitComandaFechada({ comandaId: id, total });
     Alert.alert('Comanda fechada', `Total: ${money(total)}`);
     carregar();
   };
@@ -55,6 +54,8 @@ export default function ComandasListScreen({ navigation }) {
       <TextInput
         style={styles.input}
         placeholder="Buscar por nome..."
+        // (placeholderTextColor já vem do App.js; se quiser, pode repetir aqui)
+        // placeholderTextColor="#9E9E9E"
         value={filtro}
         onChangeText={setFiltro}
       />
@@ -92,7 +93,8 @@ const styles = StyleSheet.create({
   btnDash: { backgroundColor: '#455a64', padding: 12, borderRadius: 8, alignItems: 'center', paddingHorizontal: 16 },
   btnText: { color: '#fff', fontWeight: 'bold' },
   counter: { fontWeight: '600', marginBottom: 10, color: '#333' },
-  input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 12, marginBottom: 12 },
+  // >>> Input com fundo branco + texto escuro
+  input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 12, marginBottom: 12, backgroundColor: '#fff', color: '#111' },
   card: { padding: 12, borderWidth: 1, borderColor: '#eee', borderRadius: 10, marginBottom: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   nome: { fontSize: 18, fontWeight: 'bold' },
   status: { color: '#666', marginTop: 4 },

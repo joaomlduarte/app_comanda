@@ -30,7 +30,7 @@ export default function ExportarScreen() {
         FROM comandas c
         JOIN itens i ON i.comanda_id = c.id
         LEFT JOIN produtos p ON p.id = i.produto_id
-        WHERE c.status='fechada' AND date(c.closed_at) = date(?)
+        WHERE c.status='fechada' AND substr(c.closed_at,1,10) = ?
         ORDER BY c.nome ASC, c.id ASC
       `, [iso]);
 

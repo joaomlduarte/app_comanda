@@ -4,6 +4,8 @@ import { query, run, calcularTotalComanda } from '../db';
 import AutocompleteInput from '../components/AutocompleteInput';
 import { money } from '../utils/format';
 import { emitComandaFechada } from '../utils/events';
+import { nowSqlLocal } from '../utils/time';
+
 
 export default function NovaComandaScreen({ route, navigation }) {
   const comandaIdParam = route?.params?.comandaId ?? null;
@@ -113,7 +115,7 @@ export default function NovaComandaScreen({ route, navigation }) {
   const finalizarComanda = () => {
     if (!comandaId) return;
     const total = calcularTotalComanda(comandaId);
-    run("UPDATE comandas SET status='fechada', closed_at=datetime('now') WHERE id=?", [comandaId]);
+    run("UPDATE comandas SET status='fechada', closed_at=? WHERE id=?", [nowSqlLocal(), comandaId]);
     setStatus('fechada');
     emitComandaFechada({ comandaId, total });
     Alert.alert('Comanda fechada', `Total: ${money(total)}`);
@@ -158,6 +160,7 @@ export default function NovaComandaScreen({ route, navigation }) {
           editable={!isFechada}
           value={qtd}
           onChangeText={setQtd}
+          placeholder="Qtd"
         />
       </View>
 
@@ -211,7 +214,7 @@ export default function NovaComandaScreen({ route, navigation }) {
 
 const styles = StyleSheet.create({
   label: { fontWeight: 'bold', marginBottom: 6 },
-  input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 12, marginBottom: 8 },
+  input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 12, marginBottom: 8, backgroundColor: '#fff', color:'#111' },
   disabled: { backgroundColor: '#f1f1f1' },
   btnSalvar: { backgroundColor: '#0288d1', paddingVertical: 10, paddingHorizontal: 12, borderRadius: 8 },
   btnTextSmall: { color: '#fff', fontWeight: 'bold' },

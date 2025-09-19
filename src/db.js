@@ -99,16 +99,13 @@ export function calcularTotalComanda(comandaId) {
   return Number(total.toFixed(2));
 }
 
-export function faturamentoDoDia(isoDate) {
-  if (isWeb) return 0;
-  const rows = query(
-    `SELECT SUM(i.quantidade * i.preco_unit) AS total
-       FROM itens i
-       JOIN comandas c ON c.id = i.comanda_id
-      WHERE c.status = 'fechada'
-        AND date(c.closed_at) = date(?)`,
-    [isoDate]
-  );
-  const total = rows?.[0]?.total ?? 0;
-  return Number(total.toFixed(2));
+export function faturamentoDoDia(iso /* 'YYYY-MM-DD' */) {
+  const rows = query(`
+    SELECT SUM(i.quantidade * i.preco_unit) AS total
+    FROM comandas c
+    JOIN itens i ON i.comanda_id = c.id
+    WHERE c.status = 'fechada'
+      AND substr(c.closed_at, 1, 10) = ?
+  `, [iso]);
+  return Number(rows?.[0]?.total ?? 0);
 }

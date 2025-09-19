@@ -13,7 +13,6 @@ export default function CriarComandaScreen({ navigation }) {
     }
     const res = run("INSERT INTO comandas (nome, status) VALUES (?, 'aberta')", [n]);
     setNome('');
-    // redireciona para edição dessa comanda
     navigation.navigate('EditarComanda', { comandaId: res.lastInsertRowId });
   };
 
@@ -26,6 +25,7 @@ export default function CriarComandaScreen({ navigation }) {
       <TextInput
         style={styles.input}
         placeholder="Nome da comanda"
+        // placeholderTextColor vem global, mas se quiser reforçar: placeholderTextColor="#9E9E9E"
         value={nome}
         onChangeText={setNome}
       />
@@ -38,7 +38,8 @@ export default function CriarComandaScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   title: { fontSize: 20, fontWeight: 'bold', marginBottom: 6 },
-  input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 12, marginBottom: 12 },
+  // >>> Input branco + texto escuro
+  input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 12, marginBottom: 12, backgroundColor: '#fff', color: '#111' },
   btn: { backgroundColor: '#1976d2', padding: 12, borderRadius: 8, alignItems: 'center' },
   btnText: { color: '#fff', fontWeight: 'bold' }
 });

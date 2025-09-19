@@ -56,8 +56,8 @@ export default function ProdutosScreen() {
   return (
     <View style={{ flex: 1, padding: 16 }}>
       <Text style={styles.title}>{editId ? 'Editar Produto' : 'Cadastro de Produtos'}</Text>
-      <TextInput style={styles.input} placeholder="Nome" value={nome} onChangeText={setNome} />
-      <TextInput style={styles.input} placeholder="Preço (ex: 12.50)" value={preco} onChangeText={setPreco} keyboardType="decimal-pad" />
+      <TextInput style={styles.input} placeholder="Nome" value={nome} onChangeText={setNome} placeholderTextColor="#9E9E9E" />
+      <TextInput style={styles.input} placeholder="Preço (ex: 12.50)" value={preco} onChangeText={setPreco} keyboardType="decimal-pad" placeholderTextColor="#9E9E9E" />
 
       <View style={{ flexDirection: 'row', gap: 10 }}>
         <Pressable onPress={salvar} style={styles.btnSalvar}><Text style={styles.btnText}>{editId ? 'Atualizar' : 'Salvar'}</Text></Pressable>
@@ -91,7 +91,7 @@ export default function ProdutosScreen() {
 
 const styles = StyleSheet.create({
   title: { fontSize: 18, fontWeight: 'bold', marginBottom: 8 },
-  input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 12, marginBottom: 8 },
+  input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 12, marginBottom: 12, backgroundColor:"#fff", color:"#111" },
   btnSalvar: { backgroundColor: '#1976d2', padding: 12, borderRadius: 8, alignItems: 'center' },
   btnCancelar: { backgroundColor: '#757575', padding: 12, borderRadius: 8, alignItems: 'center' },
   btnText: { color: '#fff', fontWeight: 'bold' },

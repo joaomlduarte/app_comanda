@@ -19,6 +19,8 @@ import NovaComandaScreen from './src/screens/NovaComandaScreen';   // editar
 import ProdutosScreen from './src/screens/ProdutosScreen';
 import ExportarScreen from './src/screens/ExportarScreen';
 import CriarComandaScreen from './src/screens/CriarComandaScreen'; // criar
+import HistoricoScreen from './src/screens/HistoricoScreen';
+import EditarFechadaScreen from './src/screens/EditarFechadaScreen';
 import { initDb } from './src/db';
 
 const Tab = createBottomTabNavigator();
@@ -79,6 +81,26 @@ function ComandasStack() {
   );
 }
 
+// Um navigator separado só para a aba "Histórico"
+const HistStack = createNativeStackNavigator();
+
+function HistoricoStack() {
+  return (
+    <HistStack.Navigator>
+      <HistStack.Screen
+        name="HistoricoList"
+        component={HistoricoScreen}
+        options={{ title: 'Histórico' }}
+      />
+      <HistStack.Screen
+        name="EditarFechada"
+        component={EditarFechadaScreen}
+        options={{ title: 'Editar (fechada)' }}
+      />
+    </HistStack.Navigator>
+  );
+}
+
 export default function App() {
   const [ready, setReady] = useState(false);
 
@@ -100,6 +122,8 @@ export default function App() {
       {/* StatusBar sempre clara (texto escuro) */}
       <StatusBar style="dark" backgroundColor="#ffffff" />
 
+      
+
       <Tab.Navigator
         screenOptions={({ route }) => ({
           headerShown: true,
@@ -113,6 +137,8 @@ export default function App() {
                 return <MaterialCommunityIcons name="view-dashboard-outline" size={size} color={color} />;
               case 'Comandas':
                 return <MaterialCommunityIcons name="clipboard-text-outline" size={size} color={color} />;
+              case 'Histórico':
+                return <MaterialCommunityIcons name='history' size={size} color={color}/>
               case 'Produtos':
                 return <MaterialCommunityIcons name="tag-outline" size={size} color={color} />;
               case 'Exportar':
@@ -132,6 +158,7 @@ export default function App() {
         />
         <Tab.Screen name="Produtos" component={ProdutosScreen} />
         <Tab.Screen name="Exportar" component={ExportarScreen} />
+        <Tab.Screen name="Histórico" component={HistoricoStack} options={{ headerShown: false}} />
       </Tab.Navigator>
     </NavigationContainer>
   );

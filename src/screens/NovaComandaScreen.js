@@ -4,12 +4,9 @@ import { query, run, calcularTotalComanda } from '../db';
 import { money } from '../utils/format';
 import { emitComandaFechada } from '../utils/events';
 import { nowSqlLocal } from '../utils/time';
-import { useWindowDimensions } from 'react-native';
-
 
 export default function NovaComandaScreen({ route, navigation }) {
-  const comandaIdParam = route?.params?.comandaId ?? null;
-  const [comandaId, setComandaId] = useState(comandaIdParam);
+  const comandaId = route?.params?.comandaId ?? null;
 
   const [nome, setNome] = useState('');
   const [status, setStatus] = useState('aberta'); // 'aberta' | 'fechada'
@@ -24,14 +21,6 @@ export default function NovaComandaScreen({ route, navigation }) {
   // card em “ajuste rápido” (−/+)
   const [quickId, setQuickId] = useState(null);
 
-  const { width } = useWindowDimensions();
-  // ajuste se seu padding lateral mudar (a tela usa padding:16)
-  const PAD = 16;          // padding horizontal do container
-  const GUTTER = 12;       // espaço horizontal/vertical entre cards
-  // 3 colunas => 2 gutters no total: (col1) G (col2) G (col3)
-  const cardWidth = Math.floor((width - PAD * 2 - GUTTER * 2) / 3);
-
-  // total recalculado
   const total = useMemo(() => (comandaId ? calcularTotalComanda(comandaId) : 0), [itens, comandaId]);
 
   const carregarProdutos = () => {
@@ -73,7 +62,7 @@ export default function NovaComandaScreen({ route, navigation }) {
     }
   }, [comandaId]);
 
-  // inserir item (toque curto usa qtd padrão)
+  // inserir item (toque curto usa qtd padrão; faz “upsert” simples)
   const addProdutoGrid = (produto, qOverride) => {
     if (!comandaId) {
       Alert.alert('Selecione pela lista', 'Abra uma comanda na aba "Comandas".');
@@ -84,7 +73,6 @@ export default function NovaComandaScreen({ route, navigation }) {
       return;
     }
     const q = Math.max(1, parseInt(qOverride ?? qtd ?? '1', 10));
-    // upsert simples: tenta pegar último item desse produto e soma a qty
     const exist = query(
       'SELECT id, quantidade FROM itens WHERE comanda_id=? AND produto_id=? ORDER BY id DESC LIMIT 1',
       [comandaId, produto.id]
@@ -102,7 +90,6 @@ export default function NovaComandaScreen({ route, navigation }) {
     carregarItens(comandaId);
   };
 
-  // ajuste rápido (−/+) no card
   const incProduto = (p) => {
     if (isFechada || !comandaId) return;
     const exist = query(
@@ -121,7 +108,6 @@ export default function NovaComandaScreen({ route, navigation }) {
     }
     carregarItens(comandaId);
   };
-
   const decProduto = (p) => {
     if (isFechada || !comandaId) return;
     const exist = query(
@@ -138,10 +124,7 @@ export default function NovaComandaScreen({ route, navigation }) {
     carregarItens(comandaId);
   };
 
-  const toggleQuick = (p) => {
-    if (isFechada) return;
-    setQuickId((prev) => (prev === p.id ? null : p.id));
-  };
+  const toggleQuick = (p) => setQuickId((prev) => (prev === p.id ? null : p.id));
 
   const salvarNome = () => {
     if (!comandaId) return;
@@ -152,14 +135,10 @@ export default function NovaComandaScreen({ route, navigation }) {
   };
 
   const removerItem = (itemId) => {
-    if (isFechada) {
-      Alert.alert('Comanda fechada', 'Não é possível remover itens.');
-      return;
-    }
+    if (isFechada) return;
     run('DELETE FROM itens WHERE id=?', [itemId]);
     carregarItens(comandaId);
   };
-
   const inc = (itemId) => {
     if (isFechada) return;
     const i = itens.find((x) => x.id === itemId);
@@ -167,7 +146,6 @@ export default function NovaComandaScreen({ route, navigation }) {
     run('UPDATE itens SET quantidade=? WHERE id=?', [Number(i.quantidade) + 1, itemId]);
     carregarItens(comandaId);
   };
-
   const dec = (itemId) => {
     if (isFechada) return;
     const i = itens.find((x) => x.id === itemId);
@@ -181,42 +159,37 @@ export default function NovaComandaScreen({ route, navigation }) {
     if (!comandaId) return;
     const tot = calcularTotalComanda(comandaId);
 
-    Alert.alert(
-      'Finalizar comanda',
-      'Como deseja finalizar?',
-      [
-        {
-          text: 'PIX (QR)',
-          onPress: () => {
-            run("UPDATE comandas SET status='fechada', pago=?, closed_at=? WHERE id=?", [0, nowSqlLocal(), comandaId]);
-            setStatus('fechada');
-            emitComandaFechada({ comandaId, total: tot });
-            navigation.navigate('Pix', { comandaId });
-          },
+    Alert.alert('Finalizar comanda', 'Como deseja finalizar?', [
+      {
+        text: 'PIX (QR)',
+        onPress: () => {
+          run("UPDATE comandas SET status='fechada', pago=?, closed_at=? WHERE id=?", [0, nowSqlLocal(), comandaId]);
+          setStatus('fechada');
+          emitComandaFechada({ comandaId, total: tot });
+          navigation.navigate('Pix', { comandaId });
         },
-        {
-          text: 'Não pago',
-          onPress: () => {
-            run("UPDATE comandas SET status='fechada', pago=?, closed_at=? WHERE id=?", [0, nowSqlLocal(), comandaId]);
-            setStatus('fechada');
-            emitComandaFechada({ comandaId, total: tot });
-            Alert.alert('Comanda fechada', `Total: ${money(tot)} (Não paga)`);
-            navigation.navigate('Comandas');
-          },
+      },
+      {
+        text: 'Não pago',
+        onPress: () => {
+          run("UPDATE comandas SET status='fechada', pago=?, closed_at=? WHERE id=?", [0, nowSqlLocal(), comandaId]);
+          setStatus('fechada');
+          emitComandaFechada({ comandaId, total: tot });
+          Alert.alert('Comanda fechada', `Total: ${money(tot)} (Não paga)`);
+          navigation.navigate('Comandas');
         },
-        {
-          text: 'Pago',
-          onPress: () => {
-            run("UPDATE comandas SET status='fechada', pago=?, closed_at=? WHERE id=?", [1, nowSqlLocal(), comandaId]);
-            setStatus('fechada');
-            emitComandaFechada({ comandaId, total: tot });
-            Alert.alert('Comanda fechada', `Total: ${money(tot)} (Paga)`);
-            navigation.navigate('Comandas');
-          },
+      },
+      {
+        text: 'Pago',
+        onPress: () => {
+          run("UPDATE comandas SET status='fechada', pago=?, closed_at=? WHERE id=?", [1, nowSqlLocal(), comandaId]);
+          setStatus('fechada');
+          emitComandaFechada({ comandaId, total: tot });
+          Alert.alert('Comanda fechada', `Total: ${money(tot)} (Paga)`);
+          navigation.navigate('Comandas');
         },
-      ],
-      { cancelable: true }
-    );
+      },
+    ]);
   };
 
   if (!comandaId) {
@@ -229,7 +202,8 @@ export default function NovaComandaScreen({ route, navigation }) {
     );
   }
 
-  // Cabeçalho rolável (nome + qtd + grade)
+  // Cabeçalho: nome + qtd + grade (3 colunas cheias)
+  const GUTTER = 12;
   const Header = (
     <View>
       <Text style={styles.label}>Nome da Comanda</Text>
@@ -248,7 +222,6 @@ export default function NovaComandaScreen({ route, navigation }) {
         )}
       </View>
 
-      {/* Qtd padrão para toque curto */}
       <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
         <Text style={styles.label}>Qtd</Text>
         <TextInput
@@ -261,38 +234,42 @@ export default function NovaComandaScreen({ route, navigation }) {
         />
       </View>
 
-      {/* Grade de produtos */}
       <Text style={[styles.label, { marginTop: 8 }]}>
         Produtos (toque = +{Math.max(1, parseInt(qtd || '1', 10))} • segure = ajustar)
       </Text>
-      <View style={styles.grid}>
+
+      <View style={[styles.grid, { marginHorizontal: -GUTTER / 2 }]}>
         {produtos.map((p) => {
           const isQuick = quickId === p.id;
           return (
-            <Pressable
+            <View
               key={p.id}
-              style={[styles.prodCard, isFechada && { opacity: 0.6 }]}
-              disabled={isFechada}
-              onPress={() => addProdutoGrid(p, qtd)}     // toque curto = +Qtd
-              onLongPress={() => toggleQuick(p)}         // long press = mostrar −/+
-              delayLongPress={300}
+              style={{ width: '33.3333%', paddingHorizontal: GUTTER / 2, marginBottom: GUTTER }}
             >
-              <Text style={styles.prodTitle} numberOfLines={1}>{p.nome}</Text>
-              <Text style={styles.prodPrice}>{money(p.preco)}</Text>
+              <Pressable
+                style={[styles.card, isFechada && styles.cardDisabled]}
+                disabled={isFechada}
+                onPress={() => addProdutoGrid(p, qtd)}
+                onLongPress={() => toggleQuick(p)}
+                delayLongPress={250}
+              >
+                <Text style={styles.cardTitle} numberOfLines={2}>{p.nome}</Text>
+                <Text style={styles.cardPrice}>{money(p.preco)}</Text>
 
-              {isQuick ? (
-                <View style={styles.quickRow}>
-                  <Pressable onPress={() => decProduto(p)} style={[styles.quickBtn, { backgroundColor: '#455a64' }]}>
-                    <Text style={styles.quickText}>−</Text>
-                  </Pressable>
-                  <Pressable onPress={() => incProduto(p)} style={[styles.quickBtn, { backgroundColor: '#1976d2' }]}>
-                    <Text style={styles.quickText}>+</Text>
-                  </Pressable>
-                </View>
-              ) : (
-                <Text style={styles.prodHint}>toque para adicionar</Text>
-              )}
-            </Pressable>
+                {isQuick ? (
+                  <View style={styles.quickRow}>
+                    <Pressable onPress={() => decProduto(p)} style={[styles.quickBtn, styles.btnMinus]}>
+                      <Text style={styles.quickTxt}>−</Text>
+                    </Pressable>
+                    <Pressable onPress={() => incProduto(p)} style={[styles.quickBtn, styles.btnPlus]}>
+                      <Text style={styles.quickTxt}>+</Text>
+                    </Pressable>
+                  </View>
+                ) : (
+                  <Text style={styles.cardHint}>toque para adicionar</Text>
+                )}
+              </Pressable>
+            </View>
           );
         })}
       </View>
@@ -367,36 +344,28 @@ const styles = StyleSheet.create({
   btnSalvar: { backgroundColor: '#0288d1', paddingVertical: 10, paddingHorizontal: 12, borderRadius: 8 },
   btnTextSmall: { color: '#fff', fontWeight: 'bold' },
 
-  // grade de produtos (3 colunas)
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    rowGap: 8,
-    columnGap: 8,
-    marginBottom: 8,
-  },
-  prodCard: {
-    width: '32%', // 3 colunas
-    minHeight: 86,
+  grid: { flexDirection: 'row', flexWrap: 'wrap' },
+
+  card: {
     backgroundColor: '#fff',
     borderWidth: 1,
     borderColor: '#e5e5e5',
-    borderRadius: 10,
-    padding: 10,
+    borderRadius: 12,
+    padding: 12,
+    minHeight: 120,
     justifyContent: 'center',
-    marginBottom: 8,
   },
-  prodTitle: { fontWeight: 'bold', color: '#111' },
-  prodPrice: { color: '#1976d2', marginTop: 2 },
-  prodHint: { color: '#777', fontSize: 12, marginTop: 2 },
+  cardDisabled: { opacity: 0.6 },
+  cardTitle: { fontWeight: 'bold', color: '#111', fontSize: 15, minHeight: 20 },
+  cardPrice: { color: '#1976d2', marginTop: 6, fontSize: 14 },
+  cardHint: { color: '#777', fontSize: 12, marginTop: 4 },
 
-  // ajuste rápido
-  quickRow: { flexDirection: 'row', gap: 8, marginTop: 6 },
-  quickBtn: { paddingVertical: 6, paddingHorizontal: 14, borderRadius: 8 },
-  quickText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+  quickRow: { flexDirection: 'row', gap: 10, marginTop: 8 },
+  quickBtn: { paddingVertical: 6, paddingHorizontal: 16, borderRadius: 10 },
+  btnMinus: { backgroundColor: '#455a64' },
+  btnPlus: { backgroundColor: '#1976d2' },
+  quickTxt: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
 
-  // lista de itens
   itemRow: {
     flexDirection: 'row',
     alignItems: 'center',

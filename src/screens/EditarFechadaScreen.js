@@ -2,8 +2,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, TextInput, Pressable, FlatList, StyleSheet, Alert } from 'react-native';
 import { query, run, calcularTotalComanda } from '../db';
 import { money } from '../utils/format';
-import { useWindowDimensions } from 'react-native';
-
 
 export default function EditarFechadaScreen({ route, navigation }) {
   const comandaId = route?.params?.comandaId;
@@ -15,23 +13,10 @@ export default function EditarFechadaScreen({ route, navigation }) {
   const [itens, setItens] = useState([]);
   const [produtos, setProdutos] = useState([]);
 
-  // quantidade padrão para toque curto
-  const [qtd, setQtd] = useState('1');
+  const [qtd, setQtd] = useState('1');     // toque curto na grade
+  const [quickId, setQuickId] = useState(null); // ajuste rápido na grade
 
-  // card em modo ajuste rápido (−/+)
-  const [quickId, setQuickId] = useState(null);
-
-  const { width } = useWindowDimensions();
-  // ajuste se seu padding lateral mudar (a tela usa padding:16)
-  const PAD = 16;          // padding horizontal do container
-  const GUTTER = 12;       // espaço horizontal/vertical entre cards
-  // 3 colunas => 2 gutters no total: (col1) G (col2) G (col3)
-  const cardWidth = Math.floor((width - PAD * 2 - GUTTER * 2) / 3);
-
-  const total = useMemo(
-    () => (comandaId ? calcularTotalComanda(comandaId) : 0),
-    [itens, comandaId]
-  );
+  const total = useMemo(() => (comandaId ? calcularTotalComanda(comandaId) : 0), [itens, comandaId]);
 
   const carregarCabecalho = () => {
     const c = query('SELECT nome, status, closed_at, pago FROM comandas WHERE id=?', [comandaId])?.[0];
@@ -78,14 +63,16 @@ export default function EditarFechadaScreen({ route, navigation }) {
   // inserir item (toque curto usa qtd)
   const addProduto = (produto, qOverride) => {
     const q = Math.max(1, parseInt(qOverride ?? qtd ?? '1', 10));
-    run(
-      'INSERT INTO itens (comanda_id, produto_id, quantidade, preco_unit) VALUES (?,?,?,?)',
-      [comandaId, produto.id, q, produto.preco]
-    );
+    run('INSERT INTO itens (comanda_id, produto_id, quantidade, preco_unit) VALUES (?,?,?,?)', [
+      comandaId,
+      produto.id,
+      q,
+      produto.preco,
+    ]);
     carregarItens();
   };
 
-  // ajuste rápido (−/+) no card do produto
+  // ajuste rápido (−/+)
   const incProduto = (p) => {
     const exist = query(
       'SELECT id, quantidade FROM itens WHERE comanda_id=? AND produto_id=? ORDER BY id DESC LIMIT 1',
@@ -103,7 +90,6 @@ export default function EditarFechadaScreen({ route, navigation }) {
     }
     carregarItens();
   };
-
   const decProduto = (p) => {
     const exist = query(
       'SELECT id, quantidade FROM itens WHERE comanda_id=? AND produto_id=? ORDER BY id DESC LIMIT 1',
@@ -119,11 +105,9 @@ export default function EditarFechadaScreen({ route, navigation }) {
     carregarItens();
   };
 
-  const toggleQuick = (p) => {
-    setQuickId((prev) => (prev === p.id ? null : p.id));
-  };
+  const toggleQuick = (p) => setQuickId((prev) => (prev === p.id ? null : p.id));
 
-  // edição linha-a-linha da lista de itens
+  // edição na lista
   const inc = (itemId) => {
     const i = itens.find((x) => x.id === itemId);
     if (!i) return;
@@ -148,7 +132,8 @@ export default function EditarFechadaScreen({ route, navigation }) {
     setPago(novo);
   };
 
-  // Cabeçalho rolável com grade
+  // Cabeçalho (info + qtd + grade 3 colunas)
+  const GUTTER = 12;
   const Header = (
     <View>
       <Text style={styles.title}>Editar Comanda (fechada)</Text>
@@ -167,7 +152,6 @@ export default function EditarFechadaScreen({ route, navigation }) {
         </View>
       </View>
 
-      {/* Qtd padrão para toque curto */}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 }}>
         <Text style={styles.label}>Qtd</Text>
         <TextInput
@@ -179,43 +163,44 @@ export default function EditarFechadaScreen({ route, navigation }) {
         />
       </View>
 
-      {/* Grade de produtos (3 colunas) */}
       <Text style={[styles.label, { marginTop: 8 }]}>
         Produtos (toque = +{Math.max(1, parseInt(qtd || '1', 10))} • segure = ajustar)
       </Text>
-      <View style={styles.grid}>
+
+      <View style={[styles.grid, { marginHorizontal: -GUTTER / 2 }]}>
         {produtos.map((p) => {
           const isQuick = quickId === p.id;
-          const mr = idx % 3 !== 2 ? GUTTER : 0;
           return (
-            <View key={p.id} style={{ width: cardWidth, marginRight: mr, marginBottom: GUTTER }}>
+            <View
+              key={p.id}
+              style={{ width: '33.3333%', paddingHorizontal: GUTTER / 2, marginBottom: GUTTER }}
+            >
               <Pressable
-                key={p.id}
-                style={styles.prodCard}
-                onPress={() => addProduto(p, qtd)}     // toque curto: +Qtd
-                onLongPress={() => toggleQuick(p)}     // long press: mostra −/+
-                delayLongPress={300}
+                style={styles.card}
+                onPress={() => addProduto(p, qtd)}
+                onLongPress={() => toggleQuick(p)}
+                delayLongPress={250}
               >
-                <Text style={styles.prodTitle} numberOfLines={1}>{p.nome}</Text>
-                <Text style={styles.prodPrice}>{money(p.preco)}</Text>
+                <Text style={styles.cardTitle} numberOfLines={2}>{p.nome}</Text>
+                <Text style={styles.cardPrice}>{money(p.preco)}</Text>
 
                 {isQuick ? (
                   <View style={styles.quickRow}>
-                    <Pressable onPress={() => decProduto(p)} style={[styles.quickBtn, { backgroundColor: '#455a64' }]}>
-                      <Text style={styles.quickText}>−</Text>
+                    <Pressable onPress={() => decProduto(p)} style={[styles.quickBtn, styles.btnMinus]}>
+                      <Text style={styles.quickTxt}>−</Text>
                     </Pressable>
-                    <Pressable onPress={() => incProduto(p)} style={[styles.quickBtn, { backgroundColor: '#1976d2' }]}>
-                      <Text style={styles.quickText}>+</Text>
+                    <Pressable onPress={() => incProduto(p)} style={[styles.quickBtn, styles.btnPlus]}>
+                      <Text style={styles.quickTxt}>+</Text>
                     </Pressable>
                   </View>
                 ) : (
-                  <Text style={styles.prodHint}>toque para adicionar</Text>
+                  <Text style={styles.cardHint}>toque para adicionar</Text>
                 )}
               </Pressable>
             </View>
-            );
-          })}
-        </View>
+          );
+        })}
+      </View>
 
       <Text style={[styles.label, { marginTop: 12 }]}>Itens</Text>
     </View>
@@ -264,41 +249,39 @@ const styles = StyleSheet.create({
   label: { fontWeight: 'bold' },
   meta: { color: '#666' },
 
-  input: {
-    borderWidth: 1, borderColor: '#ccc', borderRadius: 8,
-    padding: 12, backgroundColor: '#fff', color: '#111'
-  },
+  input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 12, backgroundColor: '#fff', color: '#111' },
   readonly: { backgroundColor: '#f6f6f6' },
 
-  // grade (3 colunas)
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap'
-  },
+  grid: { flexDirection: 'row', flexWrap: 'wrap' },
 
-  prodCard: {
+  card: {
     backgroundColor: '#fff',
-    borderWidth: 1, 
+    borderWidth: 1,
     borderColor: '#e5e5e5',
     borderRadius: 12,
+    padding: 12,
+    minHeight: 120,
     justifyContent: 'center',
   },
-  prodTitle: { fontWeight: 'bold', color: '#111', fontSize: 15 },
-  prodPrice: { color: '#1976d2', marginTop: 4, fontSize: 14 },
-  prodHint: { color: '#777', fontSize: 12, marginTop: 2 },
+  cardTitle: { fontWeight: 'bold', color: '#111', fontSize: 15, minHeight: 20 },
+  cardPrice: { color: '#1976d2', marginTop: 6, fontSize: 14 },
+  cardHint: { color: '#777', fontSize: 12, marginTop: 4 },
 
-  // ajuste rápido
   quickRow: { flexDirection: 'row', gap: 10, marginTop: 8 },
-  quickBtn: { paddingVertical: 8, paddingHorizontal: 16, borderRadius: 10 },
-  quickText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+  quickBtn: { paddingVertical: 6, paddingHorizontal: 16, borderRadius: 10 },
+  btnMinus: { backgroundColor: '#455a64' },
+  btnPlus: { backgroundColor: '#1976d2' },
+  quickTxt: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
 
-  // lista de itens
   item: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    borderWidth: 1, borderColor: '#eee',
-    borderRadius: 8, padding: 10, marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#eee',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 8,
   },
   btnSmall: { paddingVertical: 8, paddingHorizontal: 10, borderRadius: 6 },
   btnQty: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 6 },

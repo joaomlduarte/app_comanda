@@ -133,6 +133,16 @@ export default function HistoricoScreen({ navigation }) {
                 <Pressable onPress={() => alternarPago(item.id, item.pago)} style={[styles.smallBtn, { backgroundColor: '#6a1b9a' }]}>
                   <Text style={styles.smallBtnText}>{item.pago === 1 ? 'Marcar não pago' : 'Marcar pago'}</Text>
                 </Pressable>
+                {/* Mostrar QR Pix somente se NÃO pago */}
+                {item.pago !== 1 && (
+                  <Pressable
+                    on pressRetentionOffset={() => navigation.navigate('Pix', {comandaId: item.id })}
+                    syte={[styles.masllBtn, { backgroundColor: '#oo9688'}]}
+                    >
+                      <Text sytle={styles.smallBtnText}>Mostrar QR Pix</Text>
+                  </Pressable>
+                )}
+
                 <Pressable onPress={() => removerComanda(item.id, item.nome)} style={[styles.smallBtn, { backgroundColor: '#c62828' }]}>
                   <Text style={styles.smallBtnText}>Excluir</Text>
                 </Pressable>

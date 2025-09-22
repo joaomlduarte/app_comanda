@@ -7,6 +7,7 @@ import { emitComandaFechada } from '../utils/events';
 import { nowSqlLocal } from '../utils/time';
 
 
+
 export default function NovaComandaScreen({ route, navigation }) {
   const comandaIdParam = route?.params?.comandaId ?? null;
   const [comandaId, setComandaId] = useState(comandaIdParam);
@@ -118,9 +119,17 @@ const finalizarComanda = () => {
 
   Alert.alert(
     'Finalizar comanda',
-    'Marcar como PAGA?',
+    'Como deseja finalizar?',
     [
-      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'PIX (QR)',
+        onPress: () => {
+          run("UPDATE comandas SET status='fechada', pago=?, closed_at=? WHERE id=?", [0, nowSqlLocal(), comandaId]);
+          setStatus('fechada');
+          emitComandaFechada({ comandaId, total });
+          navigation.navigate('Pix', { comandaId }); // tela recalcula o total atual
+        }
+      },
       {
         text: 'Não pago',
         onPress: () => {

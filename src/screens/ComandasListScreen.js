@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, Pressable, StyleSheet, TextInput, Alert } from 'react-native';
 import { query, run, calcularTotalComanda } from '../db';
-import { money } from '../utils/format';
 import { emitComandaFechada } from '../utils/events';
 import { nowSqlLocal } from '../utils/time';
+import { money } from '../utils/format';
+
 
 
 export default function ComandasListScreen({ navigation }) {
@@ -26,9 +27,18 @@ const fechar = (id) => {
 
   Alert.alert(
     'Finalizar comanda',
-    'Marcar como PAGA?',
+    'Como deseja finalizar?',
     [
-      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'PIX (QR)',
+        onPress: () => {
+          // fecha como NÃO pago e abre o QR
+          run("UPDATE comandas SET status='fechada', pago=?, closed_at=? WHERE id=?", [0, nowSqlLocal(), id]);
+          emitComandaFechada({ comandaId: id, total });
+          carregar();
+          navigation.navigate('Pix', { comandaId: id }); // não passa total, a tela recalcula
+        }
+      },
       {
         text: 'Não pago',
         onPress: () => {
@@ -48,7 +58,7 @@ const fechar = (id) => {
         }
       },
     ],
-    { cancelable: true }
+    { cancelable: true } // permite “cancelar” tocando fora/voltar
   );
 };
 

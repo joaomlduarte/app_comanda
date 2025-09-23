@@ -89,16 +89,9 @@ const HistStack = createNativeStackNavigator();
 function HistoricoStack() {
   return (
     <HistStack.Navigator>
-      <HistStack.Screen
-        name="HistoricoList"
-        component={HistoricoScreen}
-        options={{ title: 'Histórico' }}
-      />
-      <HistStack.Screen
-        name="EditarFechada"
-        component={EditarFechadaScreen}
-        options={{ title: 'Editar (fechada)' }}
-      />
+      <HistStack.Screen name="HistoricoList" component={HistoricoScreen} options={{ title: 'Histórico' }}/>
+      <HistStack.Screen name="EditarFechada" component={EditarFechadaScreen} options={{ title: 'Editar (fechada)' }}/>
+      <Stack.Screen name="Pix" component={PixScreen} options={{ title: 'Pagar com Pix' }} />
     </HistStack.Navigator>
   );
 }

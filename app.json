@@ -10,7 +10,7 @@
       "image": "./assets/passarinho.png.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff",
-      "plugins":[
+      "plugins": [
         "expo-sqlite",
         "expo-file-system",
         "expo-sharing"
@@ -22,15 +22,15 @@
     "assetBundlePatterns": [
       "**/*"
     ],
-
     "ios": {
       "bundleIdentifier": "com.joaoduartedev.kitutesdonardi",
       "buildNumber": "1",
       "supportsTablet": true,
-      "userInterfaceStyle":"light",
-      "infoPlist":{}
+      "userInterfaceStyle": "light",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
-
     "android": {
       "package": "com.joaoduartedev.kitutesdonardi",
       "adaptiveIcon": {

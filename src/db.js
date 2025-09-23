@@ -31,6 +31,17 @@ export function initDb() {
     console.warn('[db] SQLite indisponível no Web. Rode no Android/iOS.');
     return;
   }
+
+  try {
+  // adiciona se não existir
+  const cols = query("PRAGMA table_info(comandas)");
+  const hasMetodo = cols?.some(c => c.name === 'metodo_pagto');
+  if (!hasMetodo) {
+    run("ALTER TABLE comandas ADD COLUMN metodo_pagto TEXT"); // 'pix' | 'manual' | NULL
+  }
+} catch (e) {
+  console.warn('[DB MIGRATION metodo_pagto]', e);
+}
   
 
   // Modo WAL

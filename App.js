@@ -22,6 +22,7 @@ import CriarComandaScreen from './src/screens/CriarComandaScreen'; // criar
 import HistoricoScreen from './src/screens/HistoricoScreen';
 import EditarFechadaScreen from './src/screens/EditarFechadaScreen';
 import { initDb } from './src/db';
+import PixScreen from './src/screens/PixScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -77,6 +78,7 @@ function ComandasStack() {
       <Stack.Screen name="ComandasList" component={ComandasListScreen} options={{ title: 'Comandas' }} />
       <Stack.Screen name="CriarComanda" component={CriarComandaScreen} options={{ title: 'Criar Comanda' }} />
       <Stack.Screen name="EditarComanda" component={NovaComandaScreen} options={{ title: 'Editar Comanda' }} />
+      <Stack.Screen name="Pix" component={PixScreen} options={{ title: 'Pix' }} />
     </Stack.Navigator>
   );
 }
@@ -87,16 +89,9 @@ const HistStack = createNativeStackNavigator();
 function HistoricoStack() {
   return (
     <HistStack.Navigator>
-      <HistStack.Screen
-        name="HistoricoList"
-        component={HistoricoScreen}
-        options={{ title: 'Histórico' }}
-      />
-      <HistStack.Screen
-        name="EditarFechada"
-        component={EditarFechadaScreen}
-        options={{ title: 'Editar (fechada)' }}
-      />
+      <HistStack.Screen name="HistoricoList" component={HistoricoScreen} options={{ title: 'Histórico' }}/>
+      <HistStack.Screen name="EditarFechada" component={EditarFechadaScreen} options={{ title: 'Editar (fechada)' }}/>
+      <Stack.Screen name="Pix" component={PixScreen} options={{ title: 'Pagar com Pix' }} />
     </HistStack.Navigator>
   );
 }

@@ -2,14 +2,19 @@
   "expo": {
     "name": "Kitutes do Nardi",
     "slug": "kitutes-do-nardi",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/passarinho.png.png",
     "userInterfaceStyle": "light",
     "splash": {
       "image": "./assets/passarinho.png.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#ffffff",
+      "plugins":[
+        "expo-sqlite",
+        "expo-file-system",
+        "expo-sharing"
+      ]
     },
     "updates": {
       "fallbackToCacheTimeout": 0
@@ -17,6 +22,15 @@
     "assetBundlePatterns": [
       "**/*"
     ],
+
+    "ios": {
+      "bundleIdentifier": "com.joaoduartedev.kitutesdonardi",
+      "buildNumber": "1",
+      "supportsTablet": true,
+      "userInterfaceStyle":"light",
+      "infoPlist":{}
+    },
+
     "android": {
       "package": "com.joaoduartedev.kitutesdonardi",
       "adaptiveIcon": {

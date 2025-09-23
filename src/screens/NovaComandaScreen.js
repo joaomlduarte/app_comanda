@@ -163,7 +163,7 @@ export default function NovaComandaScreen({ route, navigation }) {
       {
         text: 'PIX (QR)',
         onPress: () => {
-          run("UPDATE comandas SET status='fechada', pago=?, closed_at=? WHERE id=?", [0, nowSqlLocal(), comandaId]);
+          run("UPDATE comandas SET status='fechada', pago=?, metodo_pagto=?, closed_at=? WHERE id=?", [1, 'pix', nowSqlLocal(), comandaId]);
           setStatus('fechada');
           emitComandaFechada({ comandaId, total: tot });
           navigation.navigate('Pix', { comandaId });
@@ -182,7 +182,7 @@ export default function NovaComandaScreen({ route, navigation }) {
       {
         text: 'Pago',
         onPress: () => {
-          run("UPDATE comandas SET status='fechada', pago=?, closed_at=? WHERE id=?", [1, nowSqlLocal(), comandaId]);
+          run("UPDATE comandas SET status='fechada', pago=?, metodo_pagto=?, closed_at=? WHERE id=?", [1, nowSqlLocal(), comandaId]);
           setStatus('fechada');
           emitComandaFechada({ comandaId, total: tot });
           Alert.alert('Comanda fechada', `Total: ${money(tot)} (Paga)`);

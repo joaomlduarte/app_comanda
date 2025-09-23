@@ -1,49 +1,45 @@
+# Kitutes do Nardi — App de Comandas (Expo SDK 54)
 
-# Kitutes do Nardi (Expo)
+Aplicativo mobile (Android e iOS) para controle de **comandas** com banco local (**SQLite**), finalização com **Pix (QR)**, exportação **XLSX**, **dashboard** de faturamento diário, **histórico** com edição de comandas fechadas e **catálogo de produtos**. O app utiliza **tema claro fixo** e navegação por abas com ícones.
 
-App de comandas para Android (funciona em celular e tablet via Expo Go).
+> **Observação:** a versão Web não é suportada (SQLite nativo). Rode no Android/iOS.
 
-## Funcionalidades
-- Cadastro de produtos (nome + preço) persistido em SQLite (local).
-- Criação de comandas, adição de itens (com autocomplete dos produtos) e remoção de itens.
-- Fechamento de comanda com cálculo de total.
-- Lista de comandas em ordem alfabética.
-- Dashboard com faturamento do dia (somente comandas fechadas).
-- Exportação de resumo de vendas do dia para XLS (compartilha o arquivo).
+---
 
-## Como rodar
+## ✨ Funcionalidades
+- **Comandas**
+  - Criar comanda e renomear.
+  - Adicionar itens do **catálogo local** (nome + preço).
+  - **Grade de produtos**: toque = `+1`; **pressione e segure** = escolher quantidade (+/−).
+  - **Finalizar**: _Pago_, _Não pago_ ou _Pix (QR)_.
+  - Fechamento grava `closed_at` e **atualiza o dashboard** em tempo real.
+- **Produtos**
+  - Cadastro de produtos (nome + preço) persistidos no SQLite.
+- **Dashboard**
+  - Faturamento do dia com **seletor de data**.
+- **Exportar**
+  - Gera **XLSX** do dia com colunas: `Comanda | Situação | Item | Qtd | Unitário | Subtotal`.
+  - Situação mostra **“pago (pix)”** quando `metodo_pagto = 'pix'`.
+- **Histórico**
+  - Filtro **dia/todas** e busca por **nome**.
+  - **Editar comanda fechada** (sem reabrir).
+  - **Marcar pago** (metodo_pagto = `manual`) ou desmarcar (metodo_pagto = `NULL`).
+  - **Mostrar QR Pix** novamente.
+  - **Excluir** comanda (remove itens e comanda).
+- **UI**
+  - **Tema claro fixo** (independente do tema do SO).
+  - Abas com **ícones** (MaterialCommunityIcons).
 
-1. **Pré‑requisitos**: Node 18+, npm, Expo CLI (`npm i -g expo`), app **Expo Go** no Android.
-2. Abra o projeto no VS Code e rode:
-   ```bash
-   npm install
-   npm start
-   ```
-3. Leia o QR Code com o **Expo Go** no Android.
+---
 
-> Observação: Tudo foi feito para rodar **no Expo Go** (sem EAS nativo).
+## 🧱 Arquitetura / Tecnologias
+- **Expo SDK 54** (React Native)
+- Navegação: **React Navigation** (Bottom Tabs + Native Stack)
+- Banco local: **expo-sqlite**
+- XLSX: **xlsx** + **expo-file-system/legacy** + **expo-sharing**
+- Pix: geração de **payload BR Code estático** com **valor** e renderização de **QR**
+- Date/time: **@react-native-community/datetimepicker**
 
-## Dependências principais
-- `expo-sqlite`: banco local persistente.
-- `@react-navigation/*`: navegação por abas.
-- `xlsx` + `expo-file-system` + `expo-sharing`: exportar e compartilhar planilha XLSX.
+---
 
-## Estrutura
-```
-src/
-  db.js               # criação das tabelas, helpers e consultas
-  utils/format.js     # helpers de formatação
-  components/AutocompleteInput.js
-  screens/
-    DashboardScreen.js
-    ComandasListScreen.js
-    NovaComandaScreen.js
-    ProdutosScreen.js
-    ExportarScreen.js
-```
-
-## Dicas
-- Para manter itens na comanda mesmo após sair e voltar, tudo já está sendo salvo na tabela `itens`.
-- A lista de comandas já ordena alfabeticamente por `nome`.
-- O Dashboard pega o faturamento do dia `date('now')` do dispositivo; ajuste o fuso se precisar.
-- Para exportar, informe a data no formato `YYYY-MM-DD` (ex.: `2025-09-18`). O arquivo é gerado e aberto no compartilhamento do Android.
+## 📁 Estrutura (essencial)
